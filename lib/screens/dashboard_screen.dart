@@ -3,10 +3,14 @@ import 'package:animate_do/animate_do.dart';
 import 'package:learn_inc/models/user_model.dart';
 import 'package:learn_inc/providers/user_provider.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
+import 'package:learn_inc/screens/user_screen.dart';
 import 'package:learn_inc/widgets/profile_modal.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:learn_inc/widgets/streak_indicator.dart';
 import 'package:learn_inc/widgets/top_bar.dart';
 import 'package:provider/provider.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -19,18 +23,28 @@ class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  bool isDayMode = true;
+  // UserModel? user;
+  // bool isLoading = true; // Loading state
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: Duration(seconds: 2),
     )..repeat(reverse: true);
 
     _animation = Tween<double>(begin: 0.0, end: -10.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+  }
+
+
+  void toggleTheme() {
+    setState(() {
+      isDayMode = !isDayMode;
+    });
   }
 
   @override
@@ -52,144 +66,140 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     final user = userProvider.user;
 
+
     return Scaffold(
-      backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Background Wave
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: CustomPaint(
-                size: const Size(double.infinity, 100),
-                painter: WavePainter(isDayMode: isDayMode),
-              ),
+      backgroundColor: isDayMode ? Color(0xFFE0F7FA) : Color(0xFF263238),
+      body: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: CustomPaint(
+              size: Size(double.infinity, 100),
+              painter: WavePainter(isDayMode: isDayMode),
             ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Top Bar with SafeArea Padding
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0), // Padding to prevent overlap
-                  child: TopBar(
-                    points: user?.points ?? 0,
-                    lives: user?.lives ?? 3,
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Top Bar
+              TopBar(
+                points: user?.points ?? 0,
+                lives: user?.lives ?? 3,
+                isDayMode: isDayMode,
+                onProfileTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => ProfileModal(
+                      fullName: user?.fullName ?? "Unknown User",
+                      profileImage: user?.profileImage ?? 'assets/avatars/avatar1.png',
+                      isDayMode: isDayMode,
+                      onNavigateToSettings: () {
+                        Navigator.pushNamed(context, '/user_screen');
+                      }, role: '',
+                    ),
+                  );
+                },
+              ),
+
+              // Animated Character
+              AnimatedBuilder(
+                animation: _animation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(0, _animation.value),
+                    child: Image.asset(
+                      'assets/octopus.png',
+                      height: 150,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
+              ),
+              // Streak Indicator
+              Column(
+                children: [
+                  StreakIndicator(
+                    streakDays: user?.streakDays ?? 0,
                     isDayMode: isDayMode,
-                    onProfileTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (context) => ProfileModal(
-                          fullName: user?.fullName ?? "Unknown User",
-                          profileImage: user?.profileImage ?? 'assets/avatars/avatar1.png',
-                          isDayMode: isDayMode,
-                          onNavigateToSettings: () {
-                            Navigator.pushNamed(context, '/user_screen');
-                          },
-                          role: '',
+                  ),
+                ],
+              ),
+
+              // Main Grid
+              FadeInUp(
+                duration: Duration(milliseconds: 1000),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: isDayMode ? Colors.white : Colors.black54,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(60),
+                      topRight: Radius.circular(60),
+                    ),
+                  ),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 1.2,
+                    ),
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      final icons = [
+                        'assets/flashcard.png',
+                        'assets/chat.png',
+                        'assets/lightbulb.png',
+                      ];
+                      final titles = ['Flashy', 'Chat', 'Learn'];
+
+                      return GestureDetector(
+                        onTap: () {
+                          if (index == 0) {
+                            // Implement flashcard logic
+                          } else if (index == 1) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ChatScreen(isDayMode: isDayMode),
+                              ),
+                            );
+                          }
+                        },
+                        child: Column(
+                          children: [
+                            Image.asset(
+                              icons[index],
+                              height: 40,
+                              width: 40,
+                              color: isDayMode ? null : Colors.grey[300],
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              titles[index],
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDayMode
+                                    ? Colors.grey[800]
+                                    : Colors.grey[400],
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
                   ),
                 ),
-
-                // Animated Character
-                AnimatedBuilder(
-                  animation: _animation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _animation.value),
-                      child: Image.asset(
-                        'assets/octopus.png',
-                        height: 150,
-                        fit: BoxFit.cover,
-                      ),
-                    );
-                  },
-                ),
-
-                // Streak Indicator
-                Column(
-                  children: [
-                    StreakIndicator(
-                      streakDays: user?.streakDays ?? 0,
-                      isDayMode: isDayMode,
-                    ),
-                  ],
-                ),
-
-                // Main Grid
-                FadeInUp(
-                  duration: const Duration(milliseconds: 1000),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: isDayMode ? Colors.white : Colors.black54,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(60),
-                        topRight: Radius.circular(60),
-                      ),
-                    ),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 1.2,
-                      ),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        final icons = [
-                          'assets/flashcard.png',
-                          'assets/chat.png',
-                          'assets/lightbulb.png',
-                        ];
-                        final titles = ['Flashy', 'Chat', 'Learn'];
-
-                        return GestureDetector(
-                          onTap: () {
-                            if (index == 0) {
-                              // Implement flashcard logic
-                            } else if (index == 1) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatScreen(isDayMode: isDayMode),
-                                ),
-                              );
-                            }
-                          },
-                          child: Column(
-                            children: [
-                              Image.asset(
-                                icons[index],
-                                height: 40,
-                                width: 40,
-                                color: isDayMode ? null : Colors.grey[300],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                titles[index],
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDayMode ? Colors.grey[800] : Colors.grey[400],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -207,8 +217,8 @@ class WavePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: isDayMode
-            ? [const Color(0xFFB3E5FC), const Color(0xFFE0F7FA)]
-            : [const Color(0xFF37474F), const Color(0xFF263238)],
+            ? [Color(0xFFB3E5FC), Color(0xFFE0F7FA)]
+            : [Color(0xFF37474F), Color(0xFF263238)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     Path path = Path();

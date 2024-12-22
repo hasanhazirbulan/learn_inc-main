@@ -1,45 +1,56 @@
 import 'package:flutter/material.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:learn_inc/models/user_model.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:provider/provider.dart';
 import 'package:learn_inc/providers/student_provider.dart';
+import 'package:learn_inc/screens/flashy_screen.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
 import 'package:learn_inc/screens/learn_screen.dart';
 import 'package:learn_inc/screens/quiz_screen.dart';
-import 'package:learn_inc/widgets/profile_modal.dart';
-import 'package:learn_inc/widgets/streak_indicator.dart';
-import 'package:learn_inc/widgets/top_bar.dart';
-import 'package:provider/provider.dart';
 
-import 'flashy_screen.dart';
+import '../widgets/profile_modal.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({Key? key}) : super(key: key);
 
   @override
-  _StudentDashboardScreen createState() => _StudentDashboardScreen();
+  _StudentDashboardScreenState createState() => _StudentDashboardScreenState();
 }
 
-class _StudentDashboardScreen extends State<StudentDashboardScreen>
+class _StudentDashboardScreenState extends State<StudentDashboardScreen>
     with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  int _currentIndex = 0; // Default index to show the MainPage
+  AnimationController? _controller; // Nullable controller
+  Animation<double>? _animation; // Nullable animation
+  late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize animation controller
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
+    // Initialize animation
     _animation = Tween<double>(begin: 0.0, end: -10.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _controller!, curve: Curves.easeInOut),
     );
+
+    // Initialize the list of pages
+    _pages = [
+      MainPage(animation: _animation, isDayMode: true), // Main page with octopus
+      FlashyScreen(isDayMode: true),
+      ChatScreen(isDayMode: true),
+      LearnScreen(isDayMode: true),
+      QuizzesScreen(isDayMode: true),
+    ];
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose(); // Dispose of the controller safely
     super.dispose();
   }
 
@@ -48,205 +59,169 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
     final studentProvider = Provider.of<StudentProvider>(context);
     final isDayMode = studentProvider.isDayMode;
 
-    if (!studentProvider.isDataLoaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final student = studentProvider.student;
-
     return Scaffold(
-      backgroundColor: isDayMode ? Color(0xFFE0F7FA) : Color(0xFF263238),
-      body: Stack(
-        children: [
-          // Custom Wave Background
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: CustomPaint(
-              size: Size(double.infinity, 100),
-              painter: WavePainter(isDayMode: isDayMode),
-            ),
-          ),
+      backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
+      body: _pages[_currentIndex], // Display the selected page
 
-          // Main Content
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Top Bar
-              Padding(
-                padding: const EdgeInsets.only(top: 40.0), // Ensure proper spacing
-                child: TopBar(
-                  points: student?.points ?? 0,
-                  lives: student?.lives ?? 3,
-                  isDayMode: isDayMode,
-                  onProfileTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (context) => ProfileModal(
-                        fullName: student?.fullName ?? "Unknown User",
-                        profileImage: student?.profileImage ??
-                            'assets/avatars/avatar1.png',
-                        isDayMode: isDayMode,
-                        onNavigateToSettings: () {
-                          Navigator.pushNamed(context, '/student_screen');
-                        },
-                        role: '',
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // Animated Octopus
-              AnimatedBuilder(
-                animation: _animation,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _animation.value),
-                    child: Image.asset(
-                      'assets/octopus.png',
-                      height: 150,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                },
-              ),
-
-              // Streak Indicator
-              StreakIndicator(
-                streakDays: student?.streakDays ?? 0,
-                isDayMode: isDayMode,
-              ),
-
-              // Main Grid with Menu Options
-              FadeInUp(
-                duration: Duration(milliseconds: 1000),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: isDayMode ? Colors.white : Colors.black54,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(60),
-                      topRight: Radius.circular(60),
-                    ),
-                  ),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 1.2,
-                    ),
-                    itemCount: 4,
-                    itemBuilder: (context, index) {
-                      final icons = [
-                        'assets/flashcard.png',
-                        'assets/chat.png',
-                        'assets/lightbulb.png',
-                        'assets/quiz.png',
-                      ];
-                      final titles = ['Flashy', 'Chat', 'Learn', 'Quiz'];
-
-                      return GestureDetector(
-                        onTap: () {
-                          if (index == 0) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FlashyScreen(isDayMode: isDayMode),
-                              ),
-                            );
-                          } else if (index == 1) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(isDayMode: isDayMode),
-                              ),
-                            );
-                          } else if (index == 2) {
-                            // Learn logic - LearnScreen'e yönlendirme
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => LearnScreen(isDayMode: isDayMode),
-                              ),
-                            );
-                          } else if (index == 3) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => QuizzesScreen(isDayMode: isDayMode),
-                              ),
-                            );
-                          }
-
-                        },
-                        child: Column(
-                          children: [
-                            Image.asset(
-                              icons[index],
-                              height: 40,
-                              width: 40,
-                              color: isDayMode ? null : Colors.grey[300],
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              titles[index],
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDayMode ? Colors.grey[800] : Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
+      // Curved Bottom Navigation Bar
+      bottomNavigationBar: CurvedNavigationBar(
+        backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
+        color: isDayMode ? const Color(0xFF4DD0E1) : const Color(0xFF37474F),
+        buttonBackgroundColor: isDayMode ? const Color(0xFF4DD0E1) : const Color(0xFF37474F),
+        height: 60,
+        animationDuration: const Duration(milliseconds: 300),
+        animationCurve: Curves.easeInOut,
+        index: _currentIndex,
+        items: <Widget>[
+          Icon(Icons.home, size: 30, color: isDayMode ? Colors.black : Colors.white),
+          Icon(Icons.flash_on, size: 30, color: isDayMode ? Colors.black : Colors.white),
+          Icon(Icons.chat, size: 30, color: isDayMode ? Colors.black : Colors.white),
+          Icon(Icons.lightbulb, size: 30, color: isDayMode ? Colors.black : Colors.white),
+          Icon(Icons.quiz, size: 30, color: isDayMode ? Colors.black : Colors.white),
         ],
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
       ),
     );
   }
 }
 
-class WavePainter extends CustomPainter {
+class MainPage extends StatelessWidget {
+  final Animation<double>? animation;
   final bool isDayMode;
 
-  WavePainter({required this.isDayMode});
+  const MainPage({Key? key, required this.animation, required this.isDayMode})
+      : super(key: key);
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: isDayMode
-            ? [Color(0xFFB3E5FC), Color(0xFFE0F7FA)]
-            : [Color(0xFF37474F), Color(0xFF263238)],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Background
+        Container(
+          color: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
+        ),
 
-    Path path = Path();
-    path.lineTo(0, size.height * 0.75);
-    path.quadraticBezierTo(
-        size.width * 0.25, size.height, size.width * 0.5, size.height * 0.75);
-    path.quadraticBezierTo(
-        size.width * 0.75, size.height * 0.5, size.width, size.height * 0.75);
-    path.lineTo(size.width, 0);
-    path.close();
+        // Top Bar
+        Positioned(
+          top: 40,
+          left: 0,
+          right: 0,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Shrimp and Heart Emojis with Counts
+                Row(
+                  children: [
+                    Text(
+                      "🍤 99",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDayMode ? Colors.black : Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      "❤️ 3",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDayMode ? Colors.black : Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
 
-    canvas.drawPath(path, paint);
+                // Streak Count in the Center
+                Text(
+                  "🔥 5 Days Streak",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDayMode ? Colors.black : Colors.white,
+                  ),
+                ),
+
+                // Profile Button
+                IconButton(
+                  icon: Icon(
+                    Icons.person,
+                    color: isDayMode ? Colors.black : Colors.white,
+                  ),
+                  onPressed: () {
+                    // Open Profile Modal
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (context) => ProfileModal(
+                        fullName: "User Name", // Replace with real data
+                        profileImage: 'assets/avatars/avatar1.png', // Replace with real data
+                        isDayMode: isDayMode,
+                        onNavigateToSettings: () {
+                          Navigator.pushNamed(context, '/settings');
+                        },
+                        role: 'Student',
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Main Content with Octopus Animation
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Floating Octopus Animation
+              if (animation != null)
+                AnimatedBuilder(
+                  animation: animation!,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(0, animation!.value),
+                      child: Image.asset(
+                        'assets/octopus.png',
+                        height: 150,
+                        fit: BoxFit.cover,
+                      ),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: 20),
+
+              // Welcome Text
+              Text(
+                "Welcome to Learn Inc!",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDayMode ? Colors.black : Colors.white,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                "Learn, Chat, Quiz, and more!",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDayMode ? Colors.black54 : Colors.grey[400],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
