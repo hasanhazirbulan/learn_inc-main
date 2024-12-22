@@ -3,7 +3,6 @@ import 'package:animate_do/animate_do.dart';
 import 'package:learn_inc/models/user_model.dart';
 import 'package:learn_inc/providers/user_provider.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
-import 'package:learn_inc/screens/user_screen.dart';
 import 'package:learn_inc/widgets/profile_modal.dart';
 import 'package:learn_inc/widgets/streak_indicator.dart';
 import 'package:learn_inc/widgets/top_bar.dart';
@@ -71,26 +70,29 @@ class _DashboardScreenState extends State<DashboardScreen>
             Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Bar
-                TopBar(
-                  points: user?.points ?? 0,
-                  lives: user?.lives ?? 3,
-                  isDayMode: isDayMode,
-                  onProfileTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (context) => ProfileModal(
-                        fullName: user?.fullName ?? "Unknown User",
-                        profileImage: user?.profileImage ?? 'assets/avatars/avatar1.png',
-                        isDayMode: isDayMode,
-                        onNavigateToSettings: () {
-                          Navigator.pushNamed(context, '/user_screen');
-                        },
-                        role: '',
-                      ),
-                    );
-                  },
+                // Top Bar with SafeArea Padding
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0), // Padding to prevent overlap
+                  child: TopBar(
+                    points: user?.points ?? 0,
+                    lives: user?.lives ?? 3,
+                    isDayMode: isDayMode,
+                    onProfileTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (context) => ProfileModal(
+                          fullName: user?.fullName ?? "Unknown User",
+                          profileImage: user?.profileImage ?? 'assets/avatars/avatar1.png',
+                          isDayMode: isDayMode,
+                          onNavigateToSettings: () {
+                            Navigator.pushNamed(context, '/user_screen');
+                          },
+                          role: '',
+                        ),
+                      );
+                    },
+                  ),
                 ),
 
                 // Animated Character

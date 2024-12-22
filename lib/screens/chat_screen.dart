@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:learn_inc/services/api_service.dart';
+import 'package:learn_inc/providers/user_provider.dart';
+import 'package:learn_inc/file_upload_helper.dart';
+import 'package:learn_inc/services/file_summary_helper.dart';
 
 class ChatScreen extends StatefulWidget {
   final bool isDayMode;
 
-  const ChatScreen({super.key, required this.isDayMode});
+  const ChatScreen({Key? key, required this.isDayMode}) : super(key: key);
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -12,11 +16,13 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ApiService _apiService = ApiService();
+  final FileSummaryHelper _fileSummaryHelper = FileSummaryHelper();
   final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   List<Map<String, String>> messages = [];
   bool isLoading = false;
+  bool isFilePickerOpen = false; // To prevent duplicate file picker calls
 
   @override
   void initState() {
@@ -28,7 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       messages.add({
         "sender": "bot",
-        "message": "Hi!  How can SashimiBot assist you today?"
+        "message": "Hi! How can Sashimi assist you today?"
       });
     });
   }
@@ -54,7 +60,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           messages.add({
             "sender": "bot",
-            "message": "An error occurred. Please try again later. "
+            "message": "An error occurred. Please try again later."
           });
           isLoading = false;
         });
@@ -62,6 +68,66 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _scrollToBottom();
     }
+  }
+
+  Future<void> _handleFileUpload(BuildContext context) async {
+    if (isFilePickerOpen) return; // Prevent duplicate calls
+
+    setState(() {
+      isFilePickerOpen = true; // Lock the file picker
+    });
+
+    try {
+      final filePath = await FileUploadHelper.pickFile();
+
+      if (filePath != null) {
+        setState(() {
+          messages.add({
+            "sender": "user",
+            "message": "Selected file: ${filePath.split('/').last}"
+          });
+        });
+
+        // Process the file to generate flashcards
+        final flashcards = await _fileSummaryHelper.pickFileAndGenerateFlashcards();
+
+        if (flashcards != null && flashcards.isNotEmpty) {
+          setState(() {
+            messages.add({
+              "sender": "bot",
+              "message": "Here are the key points:\n${flashcards.join('\n')}"
+            });
+          });
+        } else {
+          setState(() {
+            messages.add({
+              "sender": "bot",
+              "message": "Couldn't process the file. Please try again with another file."
+            });
+          });
+        }
+      } else {
+        setState(() {
+          messages.add({
+            "sender": "bot",
+            "message": "No file was selected."
+          });
+        });
+      }
+    } catch (e) {
+      setState(() {
+        messages.add({
+          "sender": "bot",
+          "message": "An error occurred during file upload: $e"
+        });
+      });
+    } finally {
+      setState(() {
+        isFilePickerOpen = false; // Unlock the file picker
+      });
+    }
+
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -76,21 +142,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
     final isDayMode = widget.isDayMode;
+    final userProfileImage = userProvider.user?.profileImage ?? 'assets/default_avatar.png';
 
     return Scaffold(
-      backgroundColor: isDayMode ? Color(0xFFE0F7FA) : Color(0xFF263238),
+      backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
       appBar: AppBar(
-        backgroundColor: isDayMode ? Color(0xff4DD0E1) : Color(0xFF37474F),
-        title: Text(
-          "SashimiBot",
-          style: TextStyle(
-            color: isDayMode ? Colors.black87 : Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        backgroundColor: isDayMode ? const Color(0xFF4DD0E1) : const Color(0xFF37474F),
+        title: const Text("Sashimi"),
         iconTheme: IconThemeData(
-          color: isDayMode ? Colors.black87 : Colors.white,
+          color: isDayMode ? Colors.black : Colors.white,
         ),
       ),
       body: Column(
@@ -103,85 +165,57 @@ class _ChatScreenState extends State<ChatScreen> {
                 final message = messages[index];
                 final isUser = message["sender"] == "user";
 
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 4.0,
-                    ),
-                    padding: const EdgeInsets.all(12.0),
-                    decoration: BoxDecoration(
-                      color: isUser
-                          ? (isDayMode ? Colors.lightBlueAccent : Colors.blueGrey)
-                          : (isDayMode ? Colors.white : Colors.grey[700]),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12.0),
-                        topRight: Radius.circular(12.0),
-                        bottomLeft: isUser ? Radius.circular(12.0) : Radius.zero,
-                        bottomRight: isUser ? Radius.zero : Radius.circular(12.0),
+                return Row(
+                  mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  children: [
+                    if (!isUser)
+                      CircleAvatar(
+                        backgroundImage: const AssetImage('assets/octopus.png'),
+                        radius: 20,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDayMode
-                              ? Colors.grey.withOpacity(0.3)
-                              : Colors.black54,
-                          blurRadius: 4.0,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      message["message"]!,
-                      style: TextStyle(
+                    Container(
+                      margin: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
                         color: isUser
-                            ? Colors.white
-                            : (isDayMode ? Colors.black87 : Colors.white),
-                        fontSize: 14,
+                            ? (isDayMode ? Colors.blueAccent : Colors.grey[600])
+                            : (isDayMode ? Colors.white : Colors.grey[700]),
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: Text(
+                        message["message"]!,
+                        style: TextStyle(
+                          color: isUser
+                              ? Colors.white
+                              : (isDayMode ? Colors.black : Colors.white),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 );
               },
             ),
           ),
-          if (isLoading)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  CircularProgressIndicator(
-                    color: isDayMode ? Colors.blue : Colors.grey[300],
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "SashimiBot is typing...",
-                    style: TextStyle(
-                      color: isDayMode ? Colors.black87 : Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           Container(
-            color: isDayMode ? Colors.white : Color(0xFF37474F),
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            color: isDayMode ? Colors.white : Colors.grey[800],
+            padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
+                IconButton(
+                  icon: Icon(Icons.attach_file,
+                      color: isDayMode ? Colors.black : Colors.white),
+                  onPressed: () => _handleFileUpload(context),
+                ),
                 Expanded(
                   child: TextField(
                     controller: _chatController,
-                    style: TextStyle(
-                      color: isDayMode ? Colors.black87 : Colors.white,
-                    ),
+                    style: TextStyle(color: isDayMode ? Colors.black : Colors.white),
                     decoration: InputDecoration(
-                      hintText: "Type a message to SashimiBot...",
+                      hintText: "Send a message...",
                       hintStyle: TextStyle(
-                        color: isDayMode ? Colors.grey[600] : Colors.grey[300],
-                      ),
+                          color: isDayMode ? Colors.black45 : Colors.white70),
                       filled: true,
-                      fillColor: isDayMode ? Colors.grey[100] : Colors.grey[800],
+                      fillColor: isDayMode ? Colors.grey[100] : Colors.grey[700],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20.0),
                         borderSide: BorderSide.none,
@@ -189,16 +223,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8.0),
-                GestureDetector(
-                  onTap: sendMessage,
-                  child: CircleAvatar(
-                    backgroundColor: isDayMode ? Color(0xff4DD0E1) : Color(0xFF607D8B),
-                    child: const Icon(
-                      Icons.send,
-                      color: Colors.white,
-                    ),
-                  ),
+                IconButton(
+                  icon: Icon(Icons.send,
+                      color: isDayMode ? const Color(0xFF4DD0E1) : Colors.blue),
+                  onPressed: sendMessage,
                 ),
               ],
             ),

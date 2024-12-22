@@ -2,16 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:learn_inc/models/user_model.dart';
 import 'package:learn_inc/providers/student_provider.dart';
-import 'package:learn_inc/providers/user_provider.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
-import 'package:learn_inc/screens/user_screen.dart';
 import 'package:learn_inc/widgets/profile_modal.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:learn_inc/widgets/streak_indicator.dart';
 import 'package:learn_inc/widgets/top_bar.dart';
 import 'package:provider/provider.dart';
-
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({Key? key}) : super(key: key);
@@ -24,8 +19,6 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  bool isDayMode = true;
-
 
   @override
   void initState() {
@@ -38,13 +31,6 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
     _animation = Tween<double>(begin: 0.0, end: -10.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
-  }
-
-
-  void toggleTheme() {
-    setState(() {
-      isDayMode = !isDayMode;
-    });
   }
 
   @override
@@ -65,13 +51,12 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
     }
 
     final student = studentProvider.student;
-    //final quizzes = studentProvider.quizzes;
-
 
     return Scaffold(
       backgroundColor: isDayMode ? Color(0xFFE0F7FA) : Color(0xFF263238),
       body: Stack(
         children: [
+          // Custom Wave Background
           Positioned(
             top: 0,
             left: 0,
@@ -81,31 +66,38 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
               painter: WavePainter(isDayMode: isDayMode),
             ),
           ),
+
+          // Main Content
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Top Bar
-              TopBar(
-                points: student?.points ?? 0,
-                lives: student?.lives ?? 3,
-                isDayMode: isDayMode,
-                onProfileTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (context) => ProfileModal(
-                      fullName: student?.fullName ?? "Unknown User",
-                      profileImage: student?.profileImage ?? 'assets/avatars/avatar1.png',
-                      isDayMode: isDayMode,
-                      onNavigateToSettings: () {
-                        Navigator.pushNamed(context, '/student_screen');
-                      }, role: '',
-                    ),
-                  );
-                },
+              Padding(
+                padding: const EdgeInsets.only(top: 40.0), // Ensure proper spacing
+                child: TopBar(
+                  points: student?.points ?? 0,
+                  lives: student?.lives ?? 3,
+                  isDayMode: isDayMode,
+                  onProfileTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (context) => ProfileModal(
+                        fullName: student?.fullName ?? "Unknown User",
+                        profileImage: student?.profileImage ??
+                            'assets/avatars/avatar1.png',
+                        isDayMode: isDayMode,
+                        onNavigateToSettings: () {
+                          Navigator.pushNamed(context, '/student_screen');
+                        },
+                        role: '',
+                      ),
+                    );
+                  },
+                ),
               ),
 
-              // Animated Character
+              // Animated Octopus
               AnimatedBuilder(
                 animation: _animation,
                 builder: (context, child) {
@@ -119,17 +111,14 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                   );
                 },
               ),
+
               // Streak Indicator
-              Column(
-                children: [
-                  StreakIndicator(
-                    streakDays: student?.streakDays ?? 0,
-                    isDayMode: isDayMode,
-                  ),
-                ],
+              StreakIndicator(
+                streakDays: student?.streakDays ?? 0,
+                isDayMode: isDayMode,
               ),
 
-              // Main Grid
+              // Main Grid with Menu Options
               FadeInUp(
                 duration: Duration(milliseconds: 1000),
                 child: Container(
@@ -149,29 +138,30 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                       crossAxisCount: 3,
                       childAspectRatio: 1.2,
                     ),
-                    itemCount: 4, // Increase item count to accommodate the new button
+                    itemCount: 4,
                     itemBuilder: (context, index) {
                       final icons = [
                         'assets/flashcard.png',
                         'assets/chat.png',
                         'assets/lightbulb.png',
-                        'assets/quiz.png', // Icon for quizzes
+                        'assets/quiz.png',
                       ];
                       final titles = ['Flashy', 'Chat', 'Learn', 'Quizzes'];
 
                       return GestureDetector(
                         onTap: () {
                           if (index == 0) {
-                            // Implement flashcard logic
+                            // Flashy logic
                           } else if (index == 1) {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => ChatScreen(isDayMode: isDayMode),
+                                builder: (context) =>
+                                    ChatScreen(isDayMode: isDayMode),
                               ),
                             );
                           } else if (index == 3) {
-                            Navigator.pushNamed(context, '/quiz_screen'); // Navigate to QuizScreen
+                            Navigator.pushNamed(context, '/quiz_screen');
                           }
                         },
                         child: Column(
@@ -188,7 +178,9 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: isDayMode ? Colors.grey[800] : Colors.grey[400],
+                                color: isDayMode
+                                    ? Colors.grey[800]
+                                    : Colors.grey[400],
                               ),
                             ),
                           ],
@@ -196,7 +188,6 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                       );
                     },
                   ),
-
                 ),
               ),
             ],

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
 import 'package:learn_inc/widgets/profile_modal.dart';
-import 'package:learn_inc/models/teacher_model.dart';
 import 'package:learn_inc/providers/teacher_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -54,130 +53,132 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
     return Scaffold(
       backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
-      body: Stack(
-        children: [
-          // Wave Header
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: CustomPaint(
-              size: const Size(double.infinity, 100),
-              painter: WavePainter(isDayMode: isDayMode),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Wave Header
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: CustomPaint(
+                size: const Size(double.infinity, 100),
+                painter: WavePainter(isDayMode: isDayMode),
+              ),
             ),
-          ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Top Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 160, vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Teacher Dashboard",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDayMode ? Colors.black87 : Colors.white,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Teacher Dashboard",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDayMode ? Colors.black87 : Colors.white,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.person,
-                        color: isDayMode ? Colors.black87 : Colors.white,
+                      IconButton(
+                        icon: Icon(
+                          Icons.person,
+                          color: isDayMode ? Colors.black87 : Colors.white,
+                        ),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (context) => ProfileModal(
+                              fullName: teacher.fullName,
+                              profileImage: teacher.profileImage,
+                              isDayMode: isDayMode,
+                              onNavigateToSettings: () {
+                                Navigator.pushNamed(context, '/teacher_settings');
+                              },
+                              role: 'Teacher',
+                            ),
+                          );
+                        },
                       ),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (context) => ProfileModal(
-                            fullName: teacher.fullName,
-                            profileImage: teacher.profileImage,
-                            isDayMode: isDayMode,
-                            onNavigateToSettings: () {
-                              Navigator.pushNamed(context, '/teacher_settings');
-                            },
-                            role: 'Teacher',
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Animated Mascot
-              AnimatedBuilder(
-                animation: _animation,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _animation.value),
-                    child: Image.asset(
-                      'assets/octopus.png',
-                      height: 150,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                },
-              ),
-
-              // Main Dashboard Grid
-              Expanded(
-                child: FadeInUp(
-                  duration: const Duration(milliseconds: 1000),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                    decoration: BoxDecoration(
-                      color: isDayMode ? Colors.white : Colors.black54,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(60),
-                        topRight: Radius.circular(60),
+                // Animated Mascot
+                AnimatedBuilder(
+                  animation: _animation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(0, _animation.value),
+                      child: Image.asset(
+                        'assets/octopus.png',
+                        height: 150,
+                        fit: BoxFit.cover,
                       ),
-                    ),
-                    child: GridView.count(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      children: [
-                        _buildDashboardButton(
-                          context,
-                          "View Class",
-                          Icons.class_,
-                              () => Navigator.pushNamed(context, '/class_list'),
+                    );
+                  },
+                ),
+
+                // Main Dashboard Grid
+                Expanded(
+                  child: FadeInUp(
+                    duration: const Duration(milliseconds: 1000),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                      decoration: BoxDecoration(
+                        color: isDayMode ? Colors.white : Colors.black54,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(60),
+                          topRight: Radius.circular(60),
                         ),
-                        _buildDashboardButton(
-                          context,
-                          "Send Flashcards",
-                          Icons.flash_on,
-                              () => Navigator.pushNamed(context, '/send_flashcards'),
-                        ),
-                        _buildDashboardButton(
-                          context,
-                          "Send Quiz",
-                          Icons.quiz,
-                              () => Navigator.pushNamed(context, '/send_quiz'),
-                        ),
-                        _buildDashboardButton(
-                          context,
-                          "Chat",
-                          Icons.chat,
-                              () => Navigator.push(
+                      ),
+                      child: GridView.count(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        children: [
+                          _buildDashboardButton(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(isDayMode: isDayMode),
+                            "View Class",
+                            Icons.class_,
+                                () => Navigator.pushNamed(context, '/class_list'),
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            "Send Flashcards",
+                            Icons.flash_on,
+                                () => Navigator.pushNamed(context, '/send_flashcards'),
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            "Send Quiz",
+                            Icons.quiz,
+                                () => Navigator.pushNamed(context, '/send_quiz'),
+                          ),
+                          _buildDashboardButton(
+                            context,
+                            "Chat",
+                            Icons.chat,
+                                () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(isDayMode: isDayMode),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
