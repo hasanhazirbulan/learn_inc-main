@@ -6,63 +6,65 @@ import '../services/api_service.dart';
 class FileSummaryHelper {
   final ApiService _apiService = ApiService();
 
-  /// PDF seç, metni çıkar ve key points oluştur
+  /// 1) Pick a PDF
+  /// 2) Extract its text
+  /// 3) Summarize it
+  /// 4) Generate flashcards from that summary
   Future<List<String>?> pickFileAndGenerateFlashcards() async {
     try {
-      // Kullanıcıdan PDF dosyası seçmesini ister
+      // Ask user to pick a PDF
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'], // Sadece PDF dosyalarına izin ver
+        allowedExtensions: ['pdf'],
       );
 
+      // If user picked a file
       if (result != null) {
-        // Dosyayı oluştur
         File file = File(result.files.single.path!);
 
-        // PDF'den metin çıkarma
+        // 1) Extract raw text
         String extractedText = await _extractTextFromPDF(file);
-
-        // Eğer metin çıkarılamadıysa veya boşsa uyarı döndür
         if (extractedText.isEmpty) {
-          return ["No text could be extracted from the PDF. Please use a valid file."];
+          return [
+            "No text could be extracted from the PDF. Please use a valid file."
+          ];
         }
 
-        // API'ye metni gönder ve key points al
-        List<String> flashcards = await _apiService.getKeyPoints(extractedText);
+        // 2) Summarize the extracted text
+        final summary = await _apiService.summarizeDocument(extractedText);
+        if (summary.isEmpty) {
+          return ["The summary is empty. Please try another file."];
+        }
 
-        // Eğer flashcards boşsa kullanıcıyı bilgilendir
+        // 3) Generate flashcards from the summary
+        final flashcards = await _apiService.generateFlashcards(summary);
         if (flashcards.isEmpty) {
-          return ["No key points could be generated. Please try another file."];
+          return [
+            "No flashcards could be generated. Please try another file."
+          ];
         }
 
-        return flashcards; // Flashcards'ı döndür
+        return flashcards;
       } else {
-        // Dosya seçilmezse kullanıcıyı bilgilendir
+        // User canceled
         return ["No file was selected."];
       }
     } catch (e) {
-      // Genel hata yönetimi
-      print("Hata: $e");
+      print("Error while processing file: $e");
       return ["An error occurred while processing the file: $e"];
     }
   }
 
-  /// PDF'den metin çıkarma işlemi
+  /// Extract text from PDF
   Future<String> _extractTextFromPDF(File file) async {
     try {
-      // PDF belgesini yükle
-      final PdfDocument pdfDocument = PdfDocument(inputBytes: file.readAsBytesSync());
-
-      // PDF'den metni çıkar
+      final pdfDocument = PdfDocument(inputBytes: file.readAsBytesSync());
       String text = PdfTextExtractor(pdfDocument).extractText();
-
-      // Belleği temizle
       pdfDocument.dispose();
-
       return text;
     } catch (e) {
       print("PDF text extraction error: $e");
-      return ""; // Hata durumunda boş metin döndür
+      return "";
     }
   }
 }

@@ -2,11 +2,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  final String apiKey = 'AIzaSyC5gpQ5AHZDwHoJNOigtVDrRh3qgkh45RU'; // Doğru API anahtarınızı kullanın
+  // Buraya kendi Google Generative Language (PaLM) API anahtarınızı koyun:
+  final String apiKey = 'AIzaSyC5gpQ5AHZDwHoJNOigtVDrRh3qgkh45RU';
+
+  // gemini-1.5-flash-latest yerine text-bison-001 gibi başka bir model kullanıyorsanız,
+  // endpoint ve model adını güncelleyin:
   final String endpoint =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
 
-  // Chatbot API Çağrısı
+  /// 1) Chatbot API Çağrısı
   Future<String> callChatbot(String userMessage) async {
     final response = await http.post(
       Uri.parse('$endpoint?key=$apiKey'),
@@ -33,7 +37,7 @@ class ApiService {
     }
   }
 
-  // Doküman Özetleme API Çağrısı
+  /// 2) Doküman Özetleme API Çağrısı
   Future<String> summarizeDocument(String document) async {
     final response = await http.post(
       Uri.parse('$endpoint?key=$apiKey'),
@@ -62,7 +66,7 @@ class ApiService {
     }
   }
 
-  // Flashcard Oluşturma API Çağrısı
+  /// 3) Flashcard Oluşturma (GenerateFlashcards) API Çağrısı
   Future<List<String>> generateFlashcards(String text) async {
     final response = await http.post(
       Uri.parse('$endpoint?key=$apiKey'),
@@ -82,20 +86,25 @@ class ApiService {
       }),
     );
 
-    print("API Response: ${response.body}"); // API yanıtını yazdır
+    // Yanıtı debug için konsola basmak yararlı olur:
+    print("Flashcards API Response: ${response.body}");
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final result = data['candidates'][0]['content']['parts'][0]['text'];
-      return result.split('\n').where((line) => line.trim().isNotEmpty).toList();
+
+      // Gelen metni satır satır bölüp, boş satırları atlıyoruz:
+      return result
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty) // bool döndüren ifade
+          .toList();
     } else {
       throw Exception(
           'Flashcard oluşturulamadı: ${response.statusCode} - ${response.body}');
     }
   }
 
-
-  // Key Points API Çağrısı
+  /// 4) Key Points API Çağrısı
   Future<List<String>> getKeyPoints(String document) async {
     final response = await http.post(
       Uri.parse('$endpoint?key=$apiKey'),
@@ -118,20 +127,25 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final result = data['candidates'][0]['content']['parts'][0]['text'];
-      return result.split('\n').where((line) => line.trim().isNotEmpty).toList();
+
+      // Yine satır satır ayırıp boşlukları atıyoruz:
+      return result
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
     } else {
       throw Exception(
           'Key points çıkarılamadı: ${response.statusCode} - ${response.body}');
     }
   }
 
-  // Flashcard için özetleme ve ayrıştırma işlemi
+  /// 5) Tek Adımda Flashcard Üretmek İçin (Özet + KeyPoints vs.)
+  /// Burada ister `getKeyPoints`, ister `summarizeDocument` + `generateFlashcards`
+  /// gibi işlemler yapabilirsiniz. Örneğin:
   Future<List<String>> generateFlashcardsFromDocument(String document) async {
     try {
-      // Key points API'si ile key points çıkarma
-      List<String> keyPoints = await getKeyPoints(document);
-
-      // Key points listesini döndür
+      // Örnek olarak: Key Points çıkarıp direkt geri dönelim
+      final keyPoints = await getKeyPoints(document);
       return keyPoints;
     } catch (e) {
       throw Exception('Flashcard oluşturma işlemi başarısız: $e');

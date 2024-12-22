@@ -3,6 +3,8 @@ import 'package:animate_do/animate_do.dart';
 import 'package:learn_inc/models/user_model.dart';
 import 'package:learn_inc/providers/student_provider.dart';
 import 'package:learn_inc/screens/chat_screen.dart';
+import 'package:learn_inc/screens/learn_screen.dart';
+import 'package:learn_inc/screens/quiz_screen.dart';
 import 'package:learn_inc/widgets/profile_modal.dart';
 import 'package:learn_inc/widgets/streak_indicator.dart';
 import 'package:learn_inc/widgets/top_bar.dart';
@@ -146,7 +148,7 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                         'assets/lightbulb.png',
                         'assets/quiz.png',
                       ];
-                      final titles = ['Flashy', 'Chat', 'Learn', 'Quizzes'];
+                      final titles = ['Flashy', 'Chat', 'Learn', 'Quiz'];
 
                       return GestureDetector(
                         onTap: () {
@@ -156,13 +158,26 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    ChatScreen(isDayMode: isDayMode),
+                                builder: (context) => ChatScreen(isDayMode: isDayMode),
+                              ),
+                            );
+                          } else if (index == 2) {
+                            // Learn logic - LearnScreen'e yönlendirme
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => LearnScreen(isDayMode: isDayMode),
                               ),
                             );
                           } else if (index == 3) {
-                            Navigator.pushNamed(context, '/quiz_screen');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => QuizzesScreen(isDayMode: isDayMode),
+                              ),
+                            );
                           }
+
                         },
                         child: Column(
                           children: [
@@ -178,14 +193,13 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: isDayMode
-                                    ? Colors.grey[800]
-                                    : Colors.grey[400],
+                                color: isDayMode ? Colors.grey[800] : Colors.grey[400],
                               ),
                             ),
                           ],
                         ),
                       );
+
                     },
                   ),
                 ),
