@@ -20,16 +20,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // We store messages as a list of Maps. Each Map can have:
-  // {
-  //   "sender": "user" or "bot",
-  //   "messageType": "text" or "flashcards",
-  //   "message": String? (for text messages),
-  //   "flashcardsList": List<String>? (for flashcards)
-  // }
   List<Map<String, dynamic>> messages = [];
   bool isLoading = false;
   bool isFilePickerOpen = false;
+
+  // Theme colors based on mode
+  late final ThemeColors _colors;
 
   @override
   void initState() {
@@ -37,7 +33,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _addWelcomeMessage();
   }
 
-  /// Adds an initial welcome message from the bot
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _colors = ThemeColors(isDayMode: widget.isDayMode);
+  }
+
   Future<void> _addWelcomeMessage() async {
     setState(() {
       messages.add({
@@ -48,12 +49,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// Sends a normal text message to the chatbot, gets the response, then displays it
   Future<void> sendMessage() async {
     if (_chatController.text.isNotEmpty) {
       final userMessage = _chatController.text.trim();
 
-      // Add user message
       setState(() {
         messages.add({
           "sender": "user",
@@ -65,10 +64,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
       _chatController.clear();
 
-      // Call the chatbot API
       try {
         final response = await _apiService.callChatbot(userMessage);
-
         setState(() {
           messages.add({
             "sender": "bot",
@@ -92,20 +89,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// Handle file upload (PDF), show the file name, then generate flashcards
   Future<void> _handleFileUpload(BuildContext context) async {
     if (isFilePickerOpen) return;
     setState(() => isFilePickerOpen = true);
 
     try {
-      // 1) Let user pick a file
       final filePath = await FileUploadHelper.pickFile();
 
       if (filePath != null) {
-        // Extract just the file name from the path
         final fileName = filePath.split('/').last;
-
-        // Show the user a chat bubble indicating which file was selected
         setState(() {
           messages.add({
             "sender": "user",
@@ -114,16 +106,13 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         });
 
-        // 2) Actually process the file to generate flashcards
         final flashcards = await _fileSummaryHelper.pickFileAndGenerateFlashcards();
 
-        // If we got a result from pickFileAndGenerateFlashcards
         if (flashcards != null) {
           if (flashcards.length == 1 &&
               (flashcards[0].contains("No file was selected.") ||
                   flashcards[0].contains("No text could be extracted") ||
                   flashcards[0].contains("error occurred"))) {
-            // If there's an error or empty result
             setState(() {
               messages.add({
                 "sender": "bot",
@@ -132,7 +121,6 @@ class _ChatScreenState extends State<ChatScreen> {
               });
             });
           } else {
-            // We have valid flashcards
             setState(() {
               messages.add({
                 "sender": "bot",
@@ -142,7 +130,6 @@ class _ChatScreenState extends State<ChatScreen> {
             });
           }
         } else {
-          // Possibly user canceled inside pickFileAndGenerateFlashcards() or some error
           setState(() {
             messages.add({
               "sender": "bot",
@@ -151,15 +138,6 @@ class _ChatScreenState extends State<ChatScreen> {
             });
           });
         }
-      } else {
-        // user canceled from the FilePicker
-        setState(() {
-          messages.add({
-            "sender": "bot",
-            "messageType": "text",
-            "message": "No file was selected."
-          });
-        });
       }
     } catch (e) {
       setState(() {
@@ -175,7 +153,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// Scrolls the ListView to the bottom whenever new messages come in
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -190,34 +167,31 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final isDayMode = widget.isDayMode;
-
     return Scaffold(
-      backgroundColor: isDayMode ? const Color(0xFFE0F7FA) : const Color(0xFF263238),
+      backgroundColor: _colors.backgroundColor,
       appBar: AppBar(
-        backgroundColor: isDayMode ? const Color(0xFF4DD0E1) : const Color(0xFF37474F),
-        title: const Text("Chat Assistant"),
-        iconTheme: IconThemeData(
-          color: isDayMode ? Colors.black : Colors.white,
+        backgroundColor: _colors.appBarColor,
+        title: Text(
+          "Chat Assistant",
+          style: TextStyle(color: _colors.appBarTextColor),
         ),
+        iconTheme: IconThemeData(color: _colors.appBarTextColor),
+        elevation: 2,
       ),
       body: Column(
         children: [
-          // Messages List
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: messages.length,
               itemBuilder: (context, index) {
                 final message = messages[index];
-                final isUser = (message["sender"] == "user");
+                final isUser = message["sender"] == "user";
                 final messageType = message["messageType"];
 
-                // If the message is a list of flashcards
                 if (messageType == "flashcards") {
                   final flashcardsList = message["flashcardsList"] as List<String>? ?? [];
-                  // Show each flashcard in a rectangular Card
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: flashcardsList.map((flashcard) {
@@ -227,17 +201,22 @@ class _ChatScreenState extends State<ChatScreen> {
                           horizontal: 12.0,
                         ),
                         child: Card(
-                          color: isDayMode ? Colors.white : Colors.grey[700],
+                          color: _colors.flashcardColor,
                           elevation: 2,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12.0),
+                            side: BorderSide(
+                              color: _colors.flashcardBorderColor,
+                              width: 0.5,
+                            ),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
                             child: Text(
                               flashcard,
                               style: TextStyle(
-                                color: isDayMode ? Colors.black : Colors.white,
+                                color: _colors.flashcardTextColor,
+                                fontSize: 15,
                               ),
                             ),
                           ),
@@ -246,104 +225,122 @@ class _ChatScreenState extends State<ChatScreen> {
                     }).toList(),
                   );
                 }
-                // Otherwise, it's a normal text message
-                else {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 6.0,
-                      horizontal: 12.0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment:
-                      isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isUser)
-                          CircleAvatar(
-                            backgroundImage:
-                            const AssetImage('assets/octopus.png'),
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 6.0,
+                    horizontal: 12.0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment:
+                    isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (!isUser) ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _colors.avatarBorderColor,
+                              width: 1,
+                            ),
+                          ),
+                          child: const CircleAvatar(
+                            backgroundImage: AssetImage('assets/octopus.png'),
                             radius: 20,
                           ),
+                        ),
                         const SizedBox(width: 8.0),
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.all(12.0),
-                            decoration: BoxDecoration(
-                              color: isUser
-                                  ? (isDayMode ? Colors.blueAccent : Colors.grey[600])
-                                  : (isDayMode ? Colors.white : Colors.grey[700]),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(12.0),
-                                topRight: const Radius.circular(12.0),
-                                bottomLeft: isUser
-                                    ? const Radius.circular(12.0)
-                                    : Radius.zero,
-                                bottomRight: isUser
-                                    ? Radius.zero
-                                    : const Radius.circular(12.0),
-                              ),
+                      ],
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.all(12.0),
+                          decoration: BoxDecoration(
+                            color: isUser
+                                ? _colors.userMessageColor
+                                : _colors.botMessageColor,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(12.0),
+                              topRight: const Radius.circular(12.0),
+                              bottomLeft: isUser
+                                  ? const Radius.circular(12.0)
+                                  : Radius.zero,
+                              bottomRight: isUser
+                                  ? Radius.zero
+                                  : const Radius.circular(12.0),
                             ),
-                            child: Text(
-                              message["message"] ?? "",
-                              style: TextStyle(
-                                color: isUser
-                                    ? Colors.white
-                                    : (isDayMode ? Colors.black : Colors.white),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _colors.messageShadowColor,
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
                               ),
+                            ],
+                          ),
+                          child: Text(
+                            message["message"] ?? "",
+                            style: TextStyle(
+                              color: isUser
+                                  ? _colors.userMessageTextColor
+                                  : _colors.botMessageTextColor,
+                              fontSize: 15,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  );
-                }
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
           ),
-
-          // Input Bar
           Container(
-            color: isDayMode ? Colors.white : Colors.grey[800],
+            decoration: BoxDecoration(
+              color: _colors.inputBarColor,
+              boxShadow: [
+                BoxShadow(
+                  color: _colors.inputBarShadowColor,
+                  blurRadius: 4,
+                  offset: const Offset(0, -1),
+                ),
+              ],
+            ),
             padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
-                // File Upload Button
                 IconButton(
                   icon: Icon(
                     Icons.attach_file,
-                    color: isDayMode ? Colors.black : Colors.white,
+                    color: _colors.iconColor,
                   ),
                   onPressed: () => _handleFileUpload(context),
                 ),
                 const SizedBox(width: 8.0),
-                // Chat text input
                 Expanded(
                   child: TextField(
                     controller: _chatController,
-                    style: TextStyle(
-                      color: isDayMode ? Colors.black : Colors.white,
-                    ),
+                    style: TextStyle(color: _colors.inputTextColor),
                     decoration: InputDecoration(
                       hintText: "Send a message...",
-                      hintStyle: TextStyle(
-                        color: isDayMode ? Colors.black45 : Colors.white70,
-                      ),
+                      hintStyle: TextStyle(color: _colors.hintTextColor),
                       filled: true,
-                      fillColor:
-                      isDayMode ? Colors.grey[100] : Colors.grey[700],
+                      fillColor: _colors.inputFillColor,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20.0),
                         borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8.0),
-                // Send Message Button
                 IconButton(
                   icon: Icon(
                     Icons.send,
-                    color: isDayMode ? const Color(0xFF4DD0E1) : Colors.blue,
+                    color: _colors.sendButtonColor,
                   ),
                   onPressed: sendMessage,
                 ),
@@ -354,4 +351,81 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+}
+
+// Separate class to manage theme colors
+class ThemeColors {
+  final bool isDayMode;
+
+  ThemeColors({required this.isDayMode});
+
+  Color get backgroundColor => isDayMode
+      ? const Color(0xFFF5F5F5)
+      : const Color(0xFF121212);
+
+  Color get appBarColor => isDayMode
+      ? const Color(0xFF4DD0E1)
+      : const Color(0xFF1E1E1E);
+
+  Color get appBarTextColor => isDayMode
+      ? Colors.black
+      : Colors.white;
+
+  Color get userMessageColor => isDayMode
+      ? const Color(0xFF2196F3)
+      : const Color(0xFF1565C0);
+
+  Color get botMessageColor => isDayMode
+      ? Colors.white
+      : const Color(0xFF2C2C2C);
+
+  Color get userMessageTextColor => Colors.white;
+
+  Color get botMessageTextColor => isDayMode
+      ? Colors.black87
+      : Colors.white;
+
+  Color get flashcardColor => isDayMode
+      ? Colors.white
+      : const Color(0xFF2C2C2C);
+
+  Color get flashcardBorderColor => isDayMode
+      ? Colors.grey.withOpacity(0.2)
+      : Colors.grey.withOpacity(0.1);
+
+  Color get flashcardTextColor => isDayMode
+      ? Colors.black87
+      : Colors.white;
+
+  Color get inputBarColor => isDayMode
+      ? Colors.white
+      : const Color(0xFF1E1E1E);
+
+  Color get inputBarShadowColor => Colors.black.withOpacity(0.1);
+
+  Color get inputFillColor => isDayMode
+      ? const Color(0xFFF5F5F5)
+      : const Color(0xFF2C2C2C);
+
+  Color get inputTextColor => isDayMode
+      ? Colors.black87
+      : Colors.white;
+
+  Color get hintTextColor => isDayMode
+      ? Colors.black54
+      : Colors.white70;
+
+  Color get iconColor => isDayMode
+      ? Colors.black54
+      : Colors.white70;
+
+  Color get sendButtonColor => isDayMode
+      ? const Color(0xFF4DD0E1)
+      : const Color(0xFF2196F3);
+
+  Color get messageShadowColor => Colors.black.withOpacity(0.1);
+
+  Color get avatarBorderColor => isDayMode
+      ? Colors.grey.withOpacity(0.2)
+      : Colors.white24;
 }
