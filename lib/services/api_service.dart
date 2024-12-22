@@ -82,6 +82,8 @@ class ApiService {
       }),
     );
 
+    print("API Response: ${response.body}"); // API yanıtını yazdır
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final result = data['candidates'][0]['content']['parts'][0]['text'];
@@ -91,5 +93,48 @@ class ApiService {
           'Flashcard oluşturulamadı: ${response.statusCode} - ${response.body}');
     }
   }
-}
 
+
+  // Key Points API Çağrısı
+  Future<List<String>> getKeyPoints(String document) async {
+    final response = await http.post(
+      Uri.parse('$endpoint?key=$apiKey'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              {
+                "text": "Extract key points from the following document:\n\n$document"
+              }
+            ]
+          }
+        ]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final result = data['candidates'][0]['content']['parts'][0]['text'];
+      return result.split('\n').where((line) => line.trim().isNotEmpty).toList();
+    } else {
+      throw Exception(
+          'Key points çıkarılamadı: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  // Flashcard için özetleme ve ayrıştırma işlemi
+  Future<List<String>> generateFlashcardsFromDocument(String document) async {
+    try {
+      // Key points API'si ile key points çıkarma
+      List<String> keyPoints = await getKeyPoints(document);
+
+      // Key points listesini döndür
+      return keyPoints;
+    } catch (e) {
+      throw Exception('Flashcard oluşturma işlemi başarısız: $e');
+    }
+  }
+}

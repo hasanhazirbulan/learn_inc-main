@@ -42,6 +42,13 @@ dependencies:
   animate_do: ^3.0.1
   http: 1.2.2
   file_picker: ^8.1.5
+  pdf_render: ^1.3.0
+  cloud_firestore: ^5.5.1
+  firebase_storage: ^12.3.7
+  image_picker: ^1.1.2
+  syncfusion_flutter_pdf: ^28.1.33
+  provider: ^6.0.5
+
 
 dev_dependencies:
   flutter_test:
@@ -67,7 +74,14 @@ flutter:
     - assets/night_mascot.png
     - assets/streak_icon.png
     - assets/welcome_image.png
-   
-
+    - assets/lightbulb.png
+    - assets/flashcard.png
+    - assets/chat.png
+    - assets/quiz.png
+    - assets/avatars/avatar1.png
+    - assets/avatars/avatar2.png
+    - assets/avatars/avatar3.png
+    - assets/avatars/avatar4.png
+    - assets/avatars/avatar5.png
 
 

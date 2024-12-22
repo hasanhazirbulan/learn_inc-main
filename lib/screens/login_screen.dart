@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -29,8 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Perform login logic here (e.g., Firebase Authentication)
-      Navigator.pushReplacementNamed(context, '/dashboard'); // Navigate to Dashboard
+      // Perform login
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      // Kullanıcının rolüne göre yönlendirme yap
+      await checkUserRole();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login Failed: ${e.toString()}")),
@@ -41,6 +52,60 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     }
   }
+
+  Future<void> checkUserRole() async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      Navigator.pushReplacementNamed(context, '/login_screen');
+      return;
+    }
+
+    try {
+      // Students Collection
+      final studentDoc = await FirebaseFirestore.instance
+          .collection('Students')
+          .doc(user.uid)
+          .get();
+
+      if (studentDoc.exists) {
+        Navigator.pushReplacementNamed(context, '/student_dashboard_screen');
+        return;
+      }
+
+      // Teachers Collection
+      final teacherDoc = await FirebaseFirestore.instance
+          .collection('Teachers')
+          .doc(user.uid)
+          .get();
+
+      if (teacherDoc.exists) {
+        Navigator.pushReplacementNamed(context, '/teacher_dashboard_screen');
+        return;
+      }
+
+      // Users Collection
+      final userDoc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        Navigator.pushReplacementNamed(context, '/dashboard_screen');
+        return;
+      }
+
+      // Hiçbir rolde bulunamazsa giriş ekranına dön
+      print("No role found for user: ${user.uid}");
+      Navigator.pushReplacementNamed(context, '/login_screen');
+    } catch (e) {
+      print("Error checking user role: $e");
+      Navigator.pushReplacementNamed(context, '/login_screen');
+    }
+  }
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -138,20 +203,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     _isLoading
                         ? CircularProgressIndicator(color: Colors.white)
                         : ElevatedButton(
-                            onPressed: _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  _isDayMode ? Colors.teal.shade700 : Colors.grey.shade700,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: Text(
-                              "Login",
-                              style: TextStyle(fontSize: 18, color: Colors.white),
-                            ),
-                          ),
+                      onPressed: _login,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                        _isDayMode ? Colors.teal.shade700 : Colors.grey.shade700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(
+                        "Login",
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                    ),
                     SizedBox(height: 16),
                     // Sign Up Link
                     TextButton(

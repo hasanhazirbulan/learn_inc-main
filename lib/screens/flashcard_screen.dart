@@ -1,57 +1,45 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:learn_inc/services/api_service.dart';
 
 class FlashcardScreen extends StatefulWidget {
+  final List<String> flashcards;
+
+  const FlashcardScreen({super.key, required this.flashcards});
+
   @override
   _FlashcardScreenState createState() => _FlashcardScreenState();
 }
 
-class _FlashcardScreenState extends State<FlashcardScreen> {
-  final ApiService apiService = ApiService();
-  String documentContent = ""; // Yüklenen dokümanın içeriği
-  String summary = ""; // Özet
-  List<String> flashcards = []; // Flashcard listesi
+class _FlashcardScreenState extends State<FlashcardScreen>
+    with TickerProviderStateMixin {
+  List<String> cardContent = [];
+  Offset _position = Offset.zero; // Kartın pozisyonu
+  int currentCardIndex = 0; // Şu anki kart indeksi
+  double cardHeight = 200;
+  double cardWidth = 300;
 
-  Future<void> pickDocument() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['txt'], // Örnek: Sadece metin dosyalarına izin veriyoruz
-      );
-
-      if (result != null) {
-        File file = File(result.files.single.path!);
-        String content = await file.readAsString();
-        setState(() {
-          documentContent = content;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        documentContent = "Hata: $e";
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    cardContent = widget.flashcards; // Flashcard listesini al
   }
 
-  Future<void> summarizeAndGenerateFlashcards() async {
-    try {
-      // 1. Doküman özeti alın
-      final generatedSummary = await apiService.summarizeDocument(documentContent);
-      setState(() {
-        summary = generatedSummary;
-      });
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _position += details.delta; // Kartı sürüklerken pozisyonu güncelle
+    });
+  }
 
-      // 2. Özete göre flashcard oluştur
-      final generatedFlashcards = await apiService.generateFlashcards(generatedSummary);
+  void _onDragEnd(DragEndDetails details) {
+    if (_position.dx.abs() > 150) {
+      // Kart belirli bir mesafenin ötesine sürüklenirse
       setState(() {
-        flashcards = generatedFlashcards;
+        _position = Offset.zero; // Pozisyonu sıfırla
+        cardContent.removeAt(currentCardIndex); // Şu anki kartı listeden kaldır
       });
-    } catch (e) {
+    } else {
+      // Sürükleme yeterli değilse, kartı geri yerine getir
       setState(() {
-        summary = "Hata: $e";
-        flashcards = ["Flashcard oluşturulamadı: $e"];
+        _position = Offset.zero;
       });
     }
   }
@@ -59,42 +47,66 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Dokümandan Flashcard Oluşturma")),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ElevatedButton(
-                onPressed: pickDocument,
-                child: Text("Doküman Yükle"),
+      appBar: AppBar(
+        title: Text("Flashcards"),
+      ),
+      body: Center(
+        child: cardContent.isEmpty
+            ? Text(
+          "Tüm flashcard'lar bitti!",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        )
+            : Stack(
+          children: cardContent.asMap().entries.map((entry) {
+            final index = entry.key;
+            final text = entry.value;
+
+            return AnimatedPositioned(
+              duration: Duration(milliseconds: 300),
+              left: _position.dx,
+              top: _position.dy,
+              child: GestureDetector(
+                onPanUpdate: _onDragUpdate, // Sürükleme işlemi
+                onPanEnd: _onDragEnd, // Sürükleme bitişi
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  width: cardWidth,
+                  height: cardHeight,
+                  margin: EdgeInsets.only(top: index * 15.0),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0xffFF9A8B),
+                        Color(0xffFF6A88),
+                        Color(0xffFF99AC),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: Offset(2, 2),
+                      )
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              SizedBox(height: 16),
-              Text(
-                "Yüklenen Doküman İçeriği:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(documentContent.isEmpty ? "Henüz bir doküman yüklenmedi." : documentContent),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: summarizeAndGenerateFlashcards,
-                child: Text("Flashcard Oluştur"),
-              ),
-              SizedBox(height: 16),
-              Text(
-                "Özet:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(summary.isEmpty ? "Henüz bir özet oluşturulmadı." : summary),
-              SizedBox(height: 16),
-              Text(
-                "Flashcards:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              for (var card in flashcards) Text("- $card"),
-            ],
-          ),
+            );
+          }).toList(),
         ),
       ),
     );
