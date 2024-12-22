@@ -10,6 +10,8 @@ import 'package:learn_inc/widgets/streak_indicator.dart';
 import 'package:learn_inc/widgets/top_bar.dart';
 import 'package:provider/provider.dart';
 
+import 'flashy_screen.dart';
+
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({Key? key}) : super(key: key);
 
@@ -153,7 +155,12 @@ class _StudentDashboardScreen extends State<StudentDashboardScreen>
                       return GestureDetector(
                         onTap: () {
                           if (index == 0) {
-                            // Flashy logic
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FlashyScreen(isDayMode: isDayMode),
+                              ),
+                            );
                           } else if (index == 1) {
                             Navigator.push(
                               context,
