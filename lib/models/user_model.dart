@@ -1,70 +1,78 @@
 class UserModel {
-  final String? id;
+  final String uid;
   final String fullName;
   final String email;
-  final String password;
   final String profileImage;
+  final String role;
   final int points;
   final int lives;
   final int streakDays;
+  final Map<String, dynamic> roleSpecificData;
 
   const UserModel({
-    this.id,
-    required this.email,
-    required this.password,
+    required this.uid,
     required this.fullName,
+    required this.email,
     required this.profileImage,
+    required this.role,
     this.points = 0,
     this.lives = 3,
     this.streakDays = 0,
+    this.roleSpecificData = const {},
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      "FullName": fullName,
-      "Email": email,
-      "Password": password,
-      "ProfileImage": profileImage,
-      "Points": points,
-      "Lives": lives,
-      "StreakDays": streakDays,
-    };
-  }
-
-  static UserModel fromJson(Map<String, dynamic> json, String id) {
-    return UserModel(
-      id: id,
-      email: json['Email'] ?? '', // Default empty if null
-      password: json['Password'] ?? '', // Default empty
-      fullName: json['FullName'] ?? 'Unknown', // Default 'Unknown'
-      profileImage: json['ProfileImage'] ?? 'assets/avatars/default.png', // Default avatar
-      points: json['Points'] ?? 0,
-      lives: json['Lives'] ?? 3,
-      streakDays: json['StreakDays'] ?? 0,
-    );
-  }
-
-
-
+  // CopyWith Method
   UserModel copyWith({
-    String? id,
+    String? uid,
     String? fullName,
     String? email,
-    String? password,
     String? profileImage,
+    String? role,
     int? points,
     int? lives,
     int? streakDays,
+    Map<String, dynamic>? roleSpecificData,
   }) {
     return UserModel(
-      id: id ?? this.id,
-      email: email ?? this.email,
-      password: password ?? this.password,
+      uid: uid ?? this.uid,
       fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
       profileImage: profileImage ?? this.profileImage,
+      role: role ?? this.role,
       points: points ?? this.points,
       lives: lives ?? this.lives,
       streakDays: streakDays ?? this.streakDays,
+      roleSpecificData: roleSpecificData ?? this.roleSpecificData,
+    );
+  }
+
+  // toJson Method for Firebase
+  Map<String, dynamic> toJson() {
+    return {
+      "Uid": uid,
+      "FullName": fullName,
+      "Email": email,
+      "ProfileImage": profileImage,
+      "Role": role,
+      "Points": points,
+      "Lives": lives,
+      "StreakDays": streakDays,
+      "RoleSpecificData": roleSpecificData,
+    };
+  }
+
+  // fromJson Method for Firebase
+  static UserModel fromJson(Map<String, dynamic> json, String uid, Map<String, dynamic> roleSpecificData) {
+    return UserModel(
+      uid: uid,
+      fullName: json['FullName'] ?? '',
+      email: json['Email'] ?? '',
+      profileImage: json['ProfileImage'] ?? '',
+      role: json['Role'] ?? 'member',
+      points: json['Points'] ?? 0,
+      lives: json['Lives'] ?? 3,
+      streakDays: json['StreakDays'] ?? 0,
+      roleSpecificData: roleSpecificData,
     );
   }
 }

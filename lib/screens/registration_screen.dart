@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -13,62 +14,50 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = "default"; // Default role for users
+  String _selectedRole = "None"; // Default role
   bool _isLoading = false;
   bool _isDayMode = true; // Default mode
-
   Future<void> _register() async {
-    if (_selectedRole == "default") {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please select a role.")),
-      );
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Kullanıcıyı Firebase Authentication'a ekle
+      // Assign 'members' role if no role is explicitly selected
+      final role = (_selectedRole == "None") ? "members" : _selectedRole.toLowerCase();
+
+      // Register user with Firebase Authentication
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Doğru koleksiyonu belirle
-      String collection = 'Users'; // Varsayılan koleksiyon
-      if (_selectedRole == 'Teacher') {
-        collection = 'Teachers';
-      } else if (_selectedRole == 'Student') {
-        collection = 'Students';
-      }
+      // Add user data to Firestore
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.addNewUser(
+        fullName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        profileImage: "assets/avatars/avatar1.png", // Default avatar
+        role: role,
+        uid: userCredential.user!.uid,
+      );
 
-      // Seçilen koleksiyona kullanıcı verisini ekle
-      await FirebaseFirestore.instance
-          .collection(collection)
-          .doc(userCredential.user?.uid)
-          .set({
-        'FullName': _nameController.text.trim(),
-        'Email': _emailController.text.trim(),
-        'Role': _selectedRole == 'None' ? 'User' : _selectedRole,
-        'LastLogin': FieldValue.serverTimestamp(),
-      });
-
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Registration Successful!")),
       );
 
-      // Rol seçimine göre yönlendirme
-      if (_selectedRole == 'Teacher') {
+      // Redirect based on the role
+      if (role == "teacher") {
         Navigator.pushReplacementNamed(context, '/teacher_dashboard_screen');
-      } else if (_selectedRole == 'Student') {
+      } else if (role == "student") {
         Navigator.pushReplacementNamed(context, '/student_dashboard_screen');
       } else {
-        Navigator.pushReplacementNamed(context, '/dashboard_screen');
+        Navigator.pushReplacementNamed(context, '/dashboard_screen'); // Default for 'members'
       }
     } catch (e) {
+      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
@@ -78,7 +67,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       });
     }
   }
-
 
 
   @override
@@ -175,11 +163,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            //fontWeight: FontWeight.bold,
                             color: _isDayMode ? Colors.white : Colors.black87,
                           ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -187,53 +174,52 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               onPressed: () {
                                 setState(() => _selectedRole = 'Teacher');
                               },
-                              icon: Icon(Icons.school, size: 18), // Küçültülmüş ikon
+                              icon: Icon(Icons.school, size: 18),
                               label: Text(
                                 "Teacher",
-                                style: TextStyle(fontSize: 14), // Daha küçük metin boyutu
+                                style: TextStyle(fontSize: 14),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _selectedRole == 'Teacher'
-                                    ? Colors.teal.shade700 // Highlighted color
+                                    ? Colors.teal.shade700
                                     : (_isDayMode ? Colors.teal : Colors.grey[700]),
                                 foregroundColor: _selectedRole == 'Teacher'
-                                    ? Colors.white // Highlighted text color
+                                    ? Colors.white
                                     : Colors.black87,
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Daha küçük padding
-                                elevation: _selectedRole == 'Teacher' ? 6 : 2, // Elevation effect
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                elevation: _selectedRole == 'Teacher' ? 6 : 2,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20), // Daha küçük border radius
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
                             ),
-                            SizedBox(width: 12), // Daha dar aralık
+                            const SizedBox(width: 12),
                             ElevatedButton.icon(
                               onPressed: () {
                                 setState(() => _selectedRole = 'Student');
                               },
-                              icon: Icon(Icons.person, size: 18), // Küçültülmüş ikon
+                              icon: Icon(Icons.person, size: 18),
                               label: Text(
                                 "Student",
-                                style: TextStyle(fontSize: 14), // Daha küçük metin boyutu
+                                style: TextStyle(fontSize: 14),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _selectedRole == 'Student'
-                                    ? Colors.teal.shade700 // Highlighted color
-                                    : (_isDayMode ? Colors.teal : Colors.grey[600]),
+                                    ? Colors.teal.shade700
+                                    : (_isDayMode ? Colors.teal : Colors.grey[700]),
                                 foregroundColor: _selectedRole == 'Student'
-                                    ? Colors.white // Highlighted text color
+                                    ? Colors.white
                                     : Colors.black87,
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Daha küçük padding
-                                elevation: _selectedRole == 'Student' ? 6 : 2, // Elevation effect
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                elevation: _selectedRole == 'Student' ? 6 : 2,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20), // Daha küçük border radius
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 12), // Daha geniş aralık
-// None of These Option
+                        const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -242,34 +228,40 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 setState(() => _selectedRole = 'None');
                               },
                               child: Container(
-                                height: 20,
-                                width: 20,
+                                height: 40,
+                                width: 140,
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  color: _selectedRole == 'None'
+                                      ? Colors.teal.shade700
+                                      : (_isDayMode ? Colors.teal.shade200 : Colors.grey[700]),
+                                  borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: _selectedRole == 'None'
-                                        ? Colors.teal.shade700
-                                        : (_isDayMode ? Colors.white : Colors.black87),
+                                        ? Colors.teal.shade900
+                                        : Colors.transparent,
                                     width: 2,
                                   ),
-                                  color: _selectedRole == 'None' ? Colors.teal.shade700 : Colors.transparent,
                                 ),
-                              ),
-                            ),
-                            SizedBox(width: 8), // Yuvarlak kutucuk ile metin arası boşluk
-                            Text(
-                              "None of these",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _selectedRole == 'None'
-                                    ? Colors.teal.shade700
-                                    : (_isDayMode ? Colors.white : Colors.black87),
+                                child: Center(
+                                  child: Text(
+                                    "None of These",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: _selectedRole == 'None'
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ],
                     ),
+
+
                     SizedBox(height: 20),
                     _isLoading
                         ? CircularProgressIndicator(color: Colors.white)
@@ -284,18 +276,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       ),
                       child: Text(
                         "Register",
-                        style:
-                        TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/login');
-                      },
-                      child: Text(
-                        "Already have an account? Login",
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
                   ],

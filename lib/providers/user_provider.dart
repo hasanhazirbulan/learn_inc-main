@@ -1,74 +1,37 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 
 class UserProvider with ChangeNotifier {
   UserModel? _user;
   bool _isDataLoaded = false;
-  bool _isDayMode = true;
-  bool get isDayMode => _isDayMode;
-
+  bool _isDayMode = true; // Default to day mode
 
   UserModel? get user => _user;
+
   bool get isDataLoaded => _isDataLoaded;
 
+  bool get isDayMode => _isDayMode;
+
+  // Toggle Day/Night Mode
   void toggleTheme() {
     _isDayMode = !_isDayMode;
     notifyListeners();
   }
-  Future<void> loadUserData() async {
-    try {
-      print("Fetching user data...");
 
-      // Ensure data loaded flag is reset before fetching
-      _isDataLoaded = false;
-      notifyListeners();
-
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) {
-        print("No user is logged in.");
-        return;
-      }
-
-      final userDoc = await FirebaseFirestore.instance.collection('Users').doc(uid).get();
-
-      if (userDoc.exists) {
-        final data = userDoc.data();
-        print("User document found: $data");
-
-        if (data == null) {
-          print("User document is null. This shouldn't happen.");
-        } else {
-          print("Validating fields in user document...");
-          print("FullName: ${data['FullName']}");
-          print("Email: ${data['Email']}");
-          print("ProfileImage: ${data['ProfileImage']}");
-        }
-
-        // Parse the data into the UserModel
-        _user = UserModel.fromJson(data!, uid);
-        print("User data successfully loaded.");
-      } else {
-        print("No user document found for UID: $uid");
-        _user = null; // Set user to null if not found
-      }
-    } catch (e) {
-      print("Error loading user data: $e");
-      _user = null; // Ensure user is null in case of errors
-    } finally {
-      _isDataLoaded = true; // Mark data as loaded
-      notifyListeners();
-    }
-  }
+// UserProvider içine ekleyin
   Future<void> updateUserName(String newName) async {
     try {
-      if (_user != null) {
-        await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(_user!.id)
-            .update({'FullName': newName});
-        _user = _user!.copyWith(fullName: newName);
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        // Firestore'da kullanıcı adını güncelle
+        await FirebaseFirestore.instance.collection('Users').doc(uid).update({
+          'FullName': newName,
+        });
+
+        // Local user verisini güncelle
+        _user = _user?.copyWith(fullName: newName);
         notifyListeners();
       }
     } catch (e) {
@@ -76,30 +39,126 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateUserAvatar(String newAvatar) async {
+  // Update user profile image
+  Future<void> updateUserProfileImage(String newImageUrl) async {
     try {
-      if (_user != null) {
-        await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(_user!.id)
-            .update({'ProfileImage': newAvatar});
-        _user = _user!.copyWith(profileImage: newAvatar);
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        // Update Firestore with the new image URL
+        await FirebaseFirestore.instance.collection('Users').doc(uid).update({
+          'ProfileImage': newImageUrl,
+        });
+
+        // Update local user data
+        _user = _user?.copyWith(profileImage: newImageUrl);
         notifyListeners();
       }
     } catch (e) {
-      print("Error updating avatar: $e");
+      print("Error updating profile image: $e");
     }
   }
 
-
+  // Logout user
   Future<void> logout() async {
     try {
       await FirebaseAuth.instance.signOut();
       _user = null;
       _isDataLoaded = false;
+      _isDayMode = true; // Optionally reset theme
       notifyListeners();
     } catch (e) {
       print("Error logging out: $e");
+    }
+  }
+
+  Future<void> loadUserData(String uid) async {
+    try {
+      _isDataLoaded = false;
+      notifyListeners();
+
+      // Fetch shared data from main document
+      final userDoc = await FirebaseFirestore.instance.collection('Users').doc(
+          uid).get();
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        final role = data?['Role']?.toLowerCase() ?? 'member';
+
+        // Fetch role-specific data from subcollections
+        Map<String, dynamic> roleSpecificData = {};
+        if (role != 'member') {
+          final roleDataSnapshot = await FirebaseFirestore.instance
+              .collection('Users')
+              .doc(uid)
+              .collection(role) // For example: 'students', 'teachers'
+              .doc('details') // Specific document for role details
+              .get();
+
+          if (roleDataSnapshot.exists) {
+            roleSpecificData = roleDataSnapshot.data()!;
+          }
+        }
+
+        // Combine shared and role-specific data
+        _user = UserModel.fromJson(data!, uid, roleSpecificData);
+      }
+    } catch (e) {
+      print("Error loading user data: $e");
+      _user = null;
+    } finally {
+      _isDataLoaded = true;
+      notifyListeners();
+    }
+  }
+
+
+  Future<void> addNewUser({
+    required String fullName,
+    required String email,
+    required String profileImage,
+    required String role,
+    required String uid,
+  }) async {
+    final userData = {
+      "FullName": fullName,
+      "Email": email,
+      "ProfileImage": profileImage,
+      "Role": role,
+      "Points": 0,
+      "Lives": 3,
+      "StreakDays": 0,
+    };
+
+    // Role-specific default data
+    final roleSpecificData = {
+      "students": {"grade": 0, "enrolledCourses": []},
+      "teachers": {"subjects": [], "assignedClasses": []},
+      "members": {"preferences": "General Access"},
+    };
+
+    try {
+      // Add user to the 'Users' collection
+      await FirebaseFirestore.instance.collection('Users').doc(uid).set(
+          userData);
+
+      // Add user to the role-specific top-level collection
+      await FirebaseFirestore.instance
+          .collection(role.toLowerCase()) // Collection name matches the role
+          .doc(uid)
+          .set(userData);
+
+      // Add role-specific data as a subcollection in the 'Users' document
+      if (roleSpecificData.containsKey(role.toLowerCase())) {
+        await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(uid)
+            .collection(role.toLowerCase()) // Subcollection matches role
+            .doc('details') // Fixed document name
+            .set(roleSpecificData[role.toLowerCase()]!);
+      }
+
+      print("User successfully added to $role collection.");
+    } catch (e) {
+      print("Error adding new user: $e");
     }
   }
 }

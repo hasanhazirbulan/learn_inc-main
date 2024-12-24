@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
+import '../services/flashcard_generator.dart';
 
 class FlashyScreen extends StatefulWidget {
   final bool isDayMode;
@@ -14,6 +16,7 @@ class FlashyScreen extends StatefulWidget {
 class _FlashyScreenState extends State<FlashyScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlashcardGenerator _flashcardGenerator = FlashcardGenerator();
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController questionController = TextEditingController();
@@ -94,8 +97,8 @@ class _FlashyScreenState extends State<FlashyScreen> {
                         'question': questionController.text,
                         'answer': answerController.text,
                         'color': selectedColor.value,
-                        'userId': currentUser.uid, // Kullanıcıya özel ID
-                        'showAnswer': false, // Cevabın görünürlük durumu
+                        'userId': currentUser.uid,
+                        'showAnswer': false,
                       };
 
                       if (cardId != null) {
@@ -120,6 +123,47 @@ class _FlashyScreenState extends State<FlashyScreen> {
         );
       },
     );
+  }
+
+  /// Flashcardları dosyadan ekleme
+  Future<void> _addFlashcardsFromFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      String filePath = result.files.single.path!;
+      List<Map<String, String>> flashcards =
+      await _flashcardGenerator.processFileAndGenerateFlashcards(filePath);
+
+      if (flashcards.isNotEmpty) {
+        final currentUser = _auth.currentUser;
+
+        for (var card in flashcards) {
+          await _firestore.collection('flashcards').add({
+            'title': 'Generated Flashcard',
+            'question': card['question'],
+            'answer': card['answer'],
+            'color': Colors.blue.value, // Varsayılan renk
+            'userId': currentUser?.uid,
+            'showAnswer': false,
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Flashcards successfully added!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No flashcards were generated.')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No file selected.')),
+      );
+    }
   }
 
   Widget _buildColorCircle(Color color) {
@@ -153,12 +197,16 @@ class _FlashyScreenState extends State<FlashyScreen> {
             icon: const Icon(Icons.add),
             onPressed: () => _addOrEditFlashcard(),
           ),
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: _addFlashcardsFromFile,
+          ),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore
             .collection('flashcards')
-            .where('userId', isEqualTo: _auth.currentUser?.uid) // Sadece giriş yapan kullanıcıya özel kartlar
+            .where('userId', isEqualTo: _auth.currentUser?.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -188,7 +236,6 @@ class _FlashyScreenState extends State<FlashyScreen> {
 
               return GestureDetector(
                 onTap: () async {
-                  // Cevabı göstermek için veritabanında `showAnswer` alanını güncelleriz.
                   await _firestore
                       .collection('flashcards')
                       .doc(cardId)
