@@ -1,8 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 
@@ -22,57 +18,6 @@ class ProfileModal extends StatelessWidget {
     required this.onNavigateToSettings,
   }) : super(key: key);
 
-  Future<void> _uploadProfilePicture(BuildContext context) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.single.path != null) {
-        final File file = File(result.files.single.path!);
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        final uid = userProvider.user?.uid;
-
-        if (uid == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User not logged in.')),
-          );
-          return;
-        }
-
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('profile_pictures')
-            .child(uid)
-            .child('profile_picture_${DateTime.now().millisecondsSinceEpoch}.png');
-
-        final uploadTask = ref.putFile(file);
-        final snapshot = await uploadTask.whenComplete(() => null);
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-
-        await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(uid)
-            .update({'ProfileImage': downloadUrl});
-
-        await userProvider.updateUserProfileImage(downloadUrl);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile picture updated successfully!')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No file selected or invalid file path.')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload profile picture: $e')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -90,11 +35,13 @@ class ProfileModal extends StatelessWidget {
             // Profile Image
             CircleAvatar(
               radius: 40,
-              backgroundImage: profileImage.startsWith('http')
+              backgroundImage: profileImage.isNotEmpty && (profileImage.startsWith('http') || profileImage.startsWith('assets/'))
+                  ? (profileImage.startsWith('http')
                   ? NetworkImage(profileImage)
-                  : AssetImage(profileImage) as ImageProvider,
+                  : AssetImage(profileImage)) as ImageProvider
+                  : const AssetImage('assets/default_avatar.png'),
+              backgroundColor: Colors.grey[200], // Optional: Add a background color for contrast
             ),
-            const SizedBox(height: 10),
 
             // User Name
             Text(
@@ -105,19 +52,6 @@ class ProfileModal extends StatelessWidget {
                 color: isDayMode ? Colors.black87 : Colors.white,
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Upload Profile Picture Button
-            ElevatedButton.icon(
-              onPressed: () => _uploadProfilePicture(context),
-              icon: const Icon(Icons.upload_file),
-              label: const Text("Upload New Profile Picture"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDayMode ? Colors.blueAccent : Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-            ),
-
             const SizedBox(height: 20),
 
             // Navigate to Settings Button
@@ -204,6 +138,126 @@ class ProfileModal extends StatelessWidget {
                 Navigator.pop(context); // Close the modal
                 Navigator.pushReplacementNamed(context, '/login'); // Navigate to login screen
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  final bool isDayMode;
+
+  const SettingsScreen({Key? key, required this.isDayMode}) : super(key: key);
+
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final TextEditingController nameController = TextEditingController();
+  String? selectedAvatar;
+
+  final List<String> avatarPaths = [
+    'assets/avatars/avatar1.png',
+    'assets/avatars/avatar2.png',
+    'assets/avatars/avatar3.png',
+    'assets/avatars/avatar4.png',
+    'assets/avatars/avatar5.png',
+  ];
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    super.dispose();
+  }
+
+  void updateProfile() {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final newName = nameController.text.trim();
+
+    if (newName.isNotEmpty) {
+      userProvider.updateUserName(newName);
+    }
+
+    if (selectedAvatar != null) {
+      userProvider.updateUserProfileImage(selectedAvatar!);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated successfully!')),
+    );
+
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        backgroundColor: widget.isDayMode ? Colors.blue : Colors.black,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Update Name:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                hintText: userProvider.user?.fullName ?? 'Enter your name',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'Choose an Avatar:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: avatarPaths.length,
+              itemBuilder: (context, index) {
+                final avatarPath = avatarPaths[index];
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedAvatar = avatarPath;
+                    });
+                  },
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundImage: AssetImage(avatarPath),
+                    child: selectedAvatar == avatarPath
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : null,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: ElevatedButton(
+                onPressed: updateProfile,
+                child: const Text('Save Changes'),
+              ),
             ),
           ],
         ),

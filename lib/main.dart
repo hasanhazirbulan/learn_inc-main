@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:learn_inc/widgets/profile_modal.dart';
 import 'package:provider/provider.dart';
 
 import 'package:learn_inc/screens/user_screen.dart';
@@ -56,6 +57,9 @@ class MyApp extends StatelessWidget {
               '/dashboard_screen': (context) =>
                   DashboardScreen(role: userProvider.user?.role ?? 'member'),
               '/user_screen': (context) => UserScreen(),
+              '/settings': (context) => SettingsScreen(
+                isDayMode: true, // Pass the appropriate value for isDayMode
+              ),
             },
             onUnknownRoute: (settings) {
               return MaterialPageRoute(

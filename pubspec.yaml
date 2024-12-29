@@ -49,6 +49,18 @@ dependencies:
   syncfusion_flutter_pdf: ^28.1.33
   provider: ^6.0.5
   curved_navigation_bar: ^1.0.3
+  flutter_launcher_icons: ^0.14.2
+
+
+
+flutter_launcher_icons:
+  android:  "launcher_icon"
+  ios: true
+  image_path: "assets/octopus_iconn.png" # Simge olarak kullanacağınız dosya
+
+
+
+
 
 
 dev_dependencies:
@@ -78,6 +90,7 @@ flutter:
     - assets/lightbulb.png
     - assets/flashcard.png
     - assets/chat.png
+    - assets/octopus_iconn.png
     - assets/quiz.png
     - assets/avatars/avatar1.png
     - assets/avatars/avatar2.png
